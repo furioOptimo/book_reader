@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Reader</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --controls-bg: #f5f5f5;
+            --button-bg: #2c3e50;
+            --button-hover: #34495e;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #2b2c2e;
+            --text-color: #e6e6e6;
+            --controls-bg: #242424;
+            --button-bg: #34495e;
+            --button-hover: #445d78;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Georgia', serif;
+            transition: background-color 0.3s, color 0.3s;
+            filter: var(--dark-mode-filter, none);
+        }
+
+        [data-theme="dark"] body {
+            --dark-mode-filter: sepia(10%) brightness(90%) contrast(95%);
+        }
+
+        #controls {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 1rem;
+            background-color: var(--controls-bg);
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            z-index: 100;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        #book-select {
+            max-width: 180px;
+            padding: 8px;
+            border-radius: 4px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid #666;
+        }
+
+        #content {
+            max-width: 800px;
+            margin: 80px auto 40px;
+            padding: 20px;
+            line-height: 1.8;
+            letter-spacing: 0.01em;
+        }
+
+        #content * {
+            background-color: var(--bg-color) !important;
+            color: var(--text-color) !important;
+        }
+
+        #content img,
+        #content video,
+        #content canvas {
+            background-color: transparent !important;
+            filter: var(--dark-mode-image-filter, none);
+        }
+
+        [data-theme="dark"] #content img {
+            --dark-mode-image-filter: brightness(0.8);
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background-color: var(--button-bg);
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--button-hover);
+        }
+
+        .progress-container {
+            flex-grow: 1;
+            text-align: right;
+        }
+
+        #bookmark-info {
+            font-size: 0.9em;
+            color: #666;
+            cursor: pointer;
+            text-decoration: underline;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #bookmark-info:hover {
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="dark"] #bookmark-info:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        #scroll-top {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px;
+            border-radius: 50%;
+            background-color: var(--button-bg);
+            color: white;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 100;
+        }
+
+        #scroll-top.visible {
+            opacity: 1;
+        }
+
+        [data-theme="dark"] #book-select {
+            background-color: #242424;
+            color: #c8c8c8;
+            border-color: #666;
+        }
+
+        .directory-picker {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-color);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            display: none;
+        }
+
+        .directory-picker.show {
+            display: block;
+        }
+
+        #content a {
+            color: #4a90e2 !important;
+        }
+
+        [data-theme="dark"] #content a {
+            color: #6fa8e6 !important;
+            opacity: 0.9;
+        }
+
+        .search-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            position: relative;
+            min-width: 200px;
+        }
+
+        .search-input {
+            padding: 6px 28px 6px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            width: 100%;
+            transition: color 0.2s ease;
+        }
+
+        [data-theme="dark"] .search-input {
+            color: var(--text-color);
+        }
+
+        .search-clear {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #666;
+            padding: 2px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .copy-button {
+            white-space: nowrap;
+            min-width: 70px;
+        }
+
+        .highlight {
+            background-color: #ffeb3b;
+            color: black !important;
+        }
+
+        [data-theme="dark"] .highlight {
+            background-color: #665c00;
+            color: white !important;
+        }
+
+        /* Update these CSS rules for the popup and buttons */
+        #selection-popup {
+            position: absolute;
+            display: none;
+            z-index: 1000;
+            font-size: 14px;
+            user-select: none;
+            transform: translateX(-50%);
+            /* Center the popup */
+        }
+
+        .popup-buttons {
+            display: flex;
+            gap: 12px;
+            /* Comfortable spacing between buttons */
+            white-space: nowrap;
+            /* Prevent wrapping */
+        }
+
+        .popup-button {
+            background-color: var(--button-bg);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            transition: background-color 0.2s;
+            min-width: 80px;
+            /* Set minimum width */
+            text-align: center;
+            /* Center the text */
+        }
+
+        .popup-button:hover {
+            background-color: var(--button-hover);
+        }
+
+        [data-theme="dark"] .popup-button {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        @media (min-width: 1200px) {
+            #content {
+                max-width: 700px;
+                padding: 40px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="controls">
+        <select id="book-select" onchange="loadBook(this.value)">
+            <option value="">Select a book...</option>
+        </select>
+        <button onclick="toggleTheme()" id="theme-toggle">🌙 Dark Mode</button>
+        <div class="search-container">
+            <input type="text" class="search-input" placeholder="Search text..." id="search-input"
+                aria-label="Search in book">
+            <button class="search-clear" id="search-clear" aria-label="Clear search">×</button>
+        </div>
+        <button class="copy-button" id="copy-button" disabled>Copy</button>
+        <button onclick="setBookmark()">bookmark</button>
+        <div class="progress-container">
+            <span id="bookmark-info" onclick="goToBookmark()"></span>
+        </div>
+    </div>
+    <div id="content">
+        <p>Select a book from the dropdown menu above to begin reading.</p>
+    </div>
+
+    <button id="scroll-top" onclick="scrollToTop()" title="Scroll to Top">↑</button>
+
+    <div id="selection-popup">
+        <div class="popup-buttons">
+            <div class="popup-button" data-command="@p">Copy @p</div>
+            <div class="popup-button" data-command="@desc">Copy @desc</div>
+        </div>
+    </div>
+
+    <script>
+        let currentFontSize = 18;
+        let isDarkMode = false;
+        let currentBook = '';
+        let currentHighlight = null;
+        let searchDebounceTimer = null;
+    
+        async function loadBookList() {
+            const select = document.getElementById('book-select');
+            select.innerHTML = '<option value="">Select a book...</option>';
+    
+            try {
+                const response = await fetch('books.json');
+                const data = await response.json();
+                
+                const bookEntries = data.books.sort((a, b) => a.localeCompare(b));
+    
+                for (const bookName of bookEntries) {
+                    const option = document.createElement('option');
+                    option.value = bookName;
+                    option.textContent = bookName.replace('.html', '').replace(/-/g, ' ');
+                    select.appendChild(option);
+                }
+    
+                const lastBook = localStorage.getItem('lastBook');
+                if (lastBook) {
+                    select.value = lastBook;
+                    await loadBook(lastBook);
+                }
+            } catch (err) {
+                console.error('Error loading book list:', err);
+            }
+        }
+    
+        function processBookContent(content) {
+            const temp = document.createElement('div');
+            temp.innerHTML = content;
+    
+            temp.querySelectorAll('style').forEach(style => style.remove());
+    
+            temp.querySelectorAll('*').forEach(element => {
+                if (element.style) {
+                    element.style.backgroundColor = '';
+                    element.style.color = '';
+                }
+                element.classList.remove('bg-white', 'bg-black', 'text-black', 'text-white');
+            });
+    
+            return temp.innerHTML;
+        }
+    
+        async function loadBook(filename) {
+            if (!filename) return;
+    
+            try {
+                const response = await fetch(`html_books/${filename}`);
+                const content = await response.text();
+    
+                currentBook = filename;
+                localStorage.setItem('lastBook', filename);
+    
+                document.getElementById('content').innerHTML = processBookContent(content);
+                updateFontSize();
+                loadBookmark();
+            } catch (err) {
+                console.error('Error loading book:', err);
+            }
+        }
+    
+        function toggleTheme() {
+            isDarkMode = !isDarkMode;
+            document.body.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+            document.getElementById('theme-toggle').textContent =
+                isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode';
+            localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+        }
+    
+        function updateFontSize() {
+            document.getElementById('content').style.fontSize = `${currentFontSize}px`;
+            localStorage.setItem('fontSize', currentFontSize);
+        }
+    
+        function setBookmark() {
+            if (!currentBook) return;
+    
+            const scrollPosition = window.scrollY;
+            const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const percentage = Math.round((scrollPosition / totalHeight) * 100);
+    
+            const bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '{}');
+            bookmarks[currentBook] = {
+                position: scrollPosition,
+                percentage: percentage
+            };
+            localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
+    
+            updateBookmarkInfo();
+        }
+    
+        function loadBookmark() {
+            if (!currentBook) return;
+    
+            const bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '{}');
+            const bookmark = bookmarks[currentBook];
+    
+            if (bookmark) {
+                window.scrollTo(0, parseInt(bookmark.position));
+                updateBookmarkInfo();
+            }
+        }
+    
+        function goToBookmark() {
+            if (!currentBook) return;
+    
+            const bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '{}');
+            const bookmark = bookmarks[currentBook];
+    
+            if (bookmark) {
+                window.scrollTo({
+                    top: parseInt(bookmark.position),
+                    behavior: 'smooth'
+                });
+            }
+        }
+    
+        function updateBookmarkInfo() {
+            if (!currentBook) return;
+    
+            const bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '{}');
+            const bookmark = bookmarks[currentBook];
+    
+            if (bookmark) {
+                document.getElementById('bookmark-info').textContent =
+                    `📑 ${bookmark.percentage}%`;
+            } else {
+                document.getElementById('bookmark-info').textContent = '';
+            }
+        }
+    
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+    
+        function performSearch(searchText) {
+            const copyButton = document.getElementById('copy-button');
+            const searchInput = document.getElementById('search-input');
+            copyButton.disabled = true;
+            copyButton.textContent = 'Copy';
+            searchInput.style.color = ''; // Reset color
+            currentHighlight = null;
+    
+            if (!searchText.trim()) return;
+    
+            const content = document.getElementById('content');
+            const text = content.textContent;
+    
+            // Check how many times the search phrase appears
+            const searchRegex = new RegExp(escapeRegExp(searchText), 'gi');
+            const matches = Array.from(text.matchAll(searchRegex));
+    
+            if (matches.length === 0) return;
+    
+            if (matches.length === 1) {
+                // Found exactly one match, just store the exact matched text
+                currentHighlight = matches[0][0];
+                copyButton.disabled = false;
+                searchInput.style.color = '#4CAF50'; // Green color for success
+            }
+        }
+    
+        function escapeRegExp(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+    
+        function handleTextSelection(event) {
+            const selection = window.getSelection();
+            const selectedText = selection.toString().trim();
+    
+            // Check if we have enough selected text (roughly 4 words)
+            if (selectedText.length >= 15) {
+                const popup = document.getElementById('selection-popup');
+    
+                // Get the selection coordinates
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+    
+                // Position the popup above the selection
+                // Set left position to the middle of the selection
+                popup.style.left = `${window.scrollX + rect.left + (rect.width / 2)}px`;
+                popup.style.top = `${window.scrollY + rect.top - 40}px`;
+                popup.style.display = 'block';
+    
+                // Store the selected text for copying
+                popup.dataset.textToCopy = selectedText;
+            }
+        }
+    
+        function hideSelectionPopup(event) {
+            const popup = document.getElementById('selection-popup');
+            // Don't hide if clicking on the popup or its children
+            if (!popup.contains(event.target)) {
+                popup.style.display = 'none';
+            }
+        }
+    
+        async function copySelectedText(event) {
+            const button = event.target.closest('.popup-button');
+            if (!button) return;
+    
+            const popup = document.getElementById('selection-popup');
+            const textToCopy = popup.dataset.textToCopy;
+            const command = button.dataset.command;
+    
+            if (textToCopy) {
+                try {
+                    // Add the command prefix and normalize spaces
+                    const normalizedText = `${command} ${textToCopy.replace(/[\n\r]+/g, ' ').replace(/\s+/g, ' ')}`;
+                    await navigator.clipboard.writeText(normalizedText);
+    
+                    // Visual feedback
+                    const originalText = button.textContent;
+                    button.textContent = 'Copied!';
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        popup.style.display = 'none';
+                    }, 1000);
+                } catch (err) {
+                    console.error('Failed to copy text:', err);
+                    const originalText = button.textContent;
+                    button.textContent = 'Error';
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        popup.style.display = 'none';
+                    }, 1000);
+                }
+            }
+        }
+    
+        function initializeSearch() {
+            const searchInput = document.getElementById('search-input');
+            const searchClear = document.getElementById('search-clear');
+            const copyButton = document.getElementById('copy-button');
+    
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchDebounceTimer);
+                searchDebounceTimer = setTimeout(() => performSearch(e.target.value), 300);
+            });
+    
+            searchClear.addEventListener('click', () => {
+                searchInput.value = '';
+                searchInput.style.color = '';
+                copyButton.disabled = true;
+                currentHighlight = null;
+            });
+    
+            copyButton.addEventListener('click', copyHighlightedText);
+        }
+    
+        async function copyHighlightedText() {
+            if (!currentHighlight) return;
+            const copyButton = document.getElementById('copy-button');
+    
+            try {
+                // Normalize newlines to spaces and remove any duplicate spaces
+                const normalizedText = currentHighlight.replace(/[\n\r]+/g, ' ').replace(/\s+/g, ' ');
+                const textToCopy = `@p ${normalizedText}`;
+    
+                await navigator.clipboard.writeText(textToCopy);
+    
+                copyButton.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyButton.textContent = 'Copy';
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy text:', err);
+                copyButton.textContent = 'Error';
+                setTimeout(() => {
+                    copyButton.textContent = 'Copy';
+                }, 2000);
+            }
+        }
+    
+        // Show/hide scroll to top button
+        window.addEventListener('scroll', () => {
+            const scrollButton = document.getElementById('scroll-top');
+            if (window.scrollY > 300) {
+                scrollButton.classList.add('visible');
+            } else {
+                scrollButton.classList.remove('visible');
+            }
+        });
+    
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedFontSize = localStorage.getItem('fontSize');
+            if (savedFontSize) {
+                currentFontSize = parseInt(savedFontSize);
+                updateFontSize();
+            }
+    
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                toggleTheme();
+            }
+    
+            // Load books immediately
+            loadBookList();
+    
+            // Initialize search functionality
+            initializeSearch();
+    
+            // Add event listeners for text selection
+            document.addEventListener('mouseup', handleTextSelection);
+            document.addEventListener('mousedown', hideSelectionPopup);
+    
+            // Add click handler for the popup
+            const popup = document.getElementById('selection-popup');
+            popup.addEventListener('click', copySelectedText);
+        });
+    </script>
+</body>
+
+</html>
